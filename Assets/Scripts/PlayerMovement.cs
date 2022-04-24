@@ -1,8 +1,8 @@
-﻿ using System;
- using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
- using Cinemachine;
- using UnityEngine;
+using Cinemachine;
+using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -24,12 +24,14 @@ public class PlayerMovement : MonoBehaviour
 
     public GameObject smashMarker;
     public Transform playerMesh;
-    
-    
+
+
     private const float DashChargeSpeed = 3;
     private const float MovementDrag = 0.96f;
 
     private Rigidbody _rb;
+    private CameraTween _camTween;
+
     private bool _canJump;
     private bool _frozen;
     private bool _didSuperJump;
@@ -43,56 +45,55 @@ public class PlayerMovement : MonoBehaviour
     private void Awake()
     {
         _rb = GetComponent<Rigidbody>();
-        
+        _camTween = GetComponent<CameraTween>();
+
         Cursor.lockState = CursorLockMode.Locked;
     }
 
     private void FixedUpdate()
     {
         _t++;
-        
+
         // Update dashing state when active.
         if (Input.GetKey(KeyCode.LeftShift) && _canJump)
-        {
             _dashCharge = Mathf.Lerp(_dashCharge, 1f, DashChargeSpeed * Time.deltaTime);
-        }
         else
-        {
             _dashCharge = Mathf.Lerp(_dashCharge, 0f, DashChargeSpeed * Time.deltaTime);
-        }
-        
+
         // Update jump charging state when active.
         if (Input.GetButton("Jump") && _canJump)
         {
             animator.SetBool("JumpCharging", true);
-            _superJumpCharge = Mathf.Lerp(_superJumpCharge, 1f, superJumpChargeSpeed * Time.deltaTime);
+            _superJumpCharge =
+                Mathf.Lerp(_superJumpCharge, 1f, superJumpChargeSpeed * Time.deltaTime);
         }
         else
         {
             animator.SetBool("JumpCharging", false);
         }
-        
+
         // Enter smash-aiming state.
         if (Input.GetMouseButton(0) && _didSuperJump && _smashing == Vector3.zero)
         {
-            cameraFreeLook.m_Orbits[0].m_Radius = 1f;
-            cameraFreeLook.m_Orbits[1].m_Height = 4;
-            cameraFreeLook.m_Orbits[1].m_Radius = 1;
-            cameraFreeLook.m_Orbits[2].m_Height = 4;
+            _camTween.SetRigs(-1, 1, 4, 1, 4);
+            _camTween.targetFov = 30;
             smashMarker.SetActive(true);
             var ray = camera.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, groundCheckMask))
+            if (Physics.Raycast(ray, out var hit, Mathf.Infinity, groundCheckMask))
             {
                 var newVel2 = _rb.velocity;
                 newVel2.Scale(new Vector3(0.5f, 0.5f, 0.5f));
                 _rb.velocity = newVel2;
                 smashMarker.transform.position = hit.point;
+                var lookDir = hit.point - _rb.position;
+                playerMesh.rotation = Quaternion.LookRotation(lookDir);
             }
         }
 
-        cameraFreeLook.m_Lens.FieldOfView = Mathf.Lerp(40, 60, _dashCharge);
+        if (!_didSuperJump)
+            cameraFreeLook.m_Lens.FieldOfView = Mathf.Lerp(40, 60, _dashCharge);
         var currentSpeed = Mathf.Lerp(speed, dashSpeed, _dashCharge);
-        
+
         // Retrieve keyboard input.
         var horizInput = Input.GetAxis("Horizontal");
         var vertInput = Input.GetAxis("Vertical");
@@ -109,7 +110,7 @@ public class PlayerMovement : MonoBehaviour
         // Calculate and apply movement velocity.
         if (!_frozen)
         {
-            moveDir = ((forward * vertInput) + (right * horizInput)).normalized;
+            moveDir = (forward * vertInput + right * horizInput).normalized;
             if (moveDir.magnitude >= 0.05)
                 _rb.AddForce(new Vector3(moveDir.x * currentSpeed, 0, moveDir.z * currentSpeed));
         }
@@ -119,14 +120,14 @@ public class PlayerMovement : MonoBehaviour
         newVel.x *= MovementDrag;
         newVel.z *= MovementDrag;
         _rb.velocity = newVel;
-        
+
         // Apply flying movement
         if (_smashing != Vector3.zero)
         {
             var newVel3 = (_smashing - _rb.position).normalized * smashingSpeed;
             _rb.velocity = Vector3.Lerp(_rb.velocity, newVel3, smashingAccel * Time.deltaTime);
         }
-        
+
         // Apply animation.
         var animVelZ = Vector3.Dot(moveDir, camera.transform.forward);
         var animVelX = Vector3.Dot(moveDir, camera.transform.right);
@@ -134,10 +135,7 @@ public class PlayerMovement : MonoBehaviour
         animator.SetFloat("VelocityX", animVelX, 0.2f, Time.deltaTime);
 
         // Update inner mesh rotation (we don't rotate root to preserve forward direction).
-        if (moveDir != Vector3.zero)
-        {
-            playerMesh.rotation = Quaternion.LookRotation(moveDir);
-        }
+        if (moveDir != Vector3.zero) playerMesh.rotation = Quaternion.LookRotation(moveDir);
     }
 
     private void Update()
@@ -163,7 +161,7 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        if (_canJump && _t >= _lastJumpTick+10)
+        if (_canJump && _t >= _lastJumpTick + 10)
         {
             _smashing = Vector3.zero;
             _rb.useGravity = true;
@@ -172,20 +170,18 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool("Flying", false);
         }
 
-        if (_canJump && _didSuperJump && _t >= _lastSuperJumpTick+2)
+        if (_canJump && _didSuperJump && _t >= _lastSuperJumpTick + 2)
         {
             smashMarker.SetActive(false);
             _superJumpCharge = 0;
             _didSuperJump = false;
         }
-        
+
         // Transition to smashing state.
         if (Input.GetMouseButtonUp(0) && (_didSuperJump || !_canJump) && _smashing == Vector3.zero)
         {
-            cameraFreeLook.m_Orbits[0].m_Radius = 3f;
-            cameraFreeLook.m_Orbits[1].m_Height = 2.5f;
-            cameraFreeLook.m_Orbits[1].m_Radius = 4f;
-            cameraFreeLook.m_Orbits[2].m_Height = 0.4f;
+            _camTween.SetRigs(-1, 3, 2.5f, 3, 0.4f);
+            _camTween.targetFov = 40;
             smashMarker.SetActive(false);
             animator.SetBool("Flying", true);
             _smashing = smashMarker.transform.position;
