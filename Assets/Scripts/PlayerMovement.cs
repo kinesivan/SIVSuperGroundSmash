@@ -10,6 +10,7 @@ public class PlayerMovement : MonoBehaviour
     public Camera camera;
     public CinemachineFreeLook cameraFreeLook;
     public GameObject smashSmallExplosion;
+    public GameObject smashBigExplosion;
 
     public float speed;
     public float dashSpeed;
@@ -31,6 +32,7 @@ public class PlayerMovement : MonoBehaviour
     private const float DashChargeSpeed = 3;
     private const float MovementDrag = 0.96f;
     private const float DashPushMaxRadius = 2f;
+    private const float BigExplosionSmashHeightThreshold = 30f;
 
     private Rigidbody _rb;
     private CameraTween _camTween;
@@ -44,6 +46,7 @@ public class PlayerMovement : MonoBehaviour
     private float _t;
     private float _lastSuperJumpTick;
     private float _lastJumpTick;
+    private float _smashHeight;
     private Vector3 _smashing;
 
     private void Awake()
@@ -178,8 +181,16 @@ public class PlayerMovement : MonoBehaviour
 
         if (_canJump && _didSuperJump && _t >= _lastSuperJumpTick + 2)
         {
-            if (_smashing != Vector3.zero) DoSmallExplosion();
+            var smashPower = Mathf.Abs(_rb.position.y - _smashHeight);
+            if (_smashing != Vector3.zero)
+            {
+                if (smashPower < BigExplosionSmashHeightThreshold)
+                    DoSmallExplosion();
+                else
+                    DoBigExplosion();
+            }
 
+            _smashHeight = 0;
             _smashVel = Vector3.zero;
             smashMarker.SetActive(false);
             _superJumpCharge = 0;
@@ -188,18 +199,26 @@ public class PlayerMovement : MonoBehaviour
 
         if (_smashing != Vector3.zero && (_smashing - _rb.position).magnitude <= 0.3f)
         {
-            if (_smashing != Vector3.zero) DoSmallExplosion();
+            var smashPower = Mathf.Abs(_rb.position.y - _smashHeight);
+            if (_smashing != Vector3.zero)
+            {
+                if (smashPower < BigExplosionSmashHeightThreshold)
+                    DoSmallExplosion();
+                else
+                    DoBigExplosion();
+            }
 
+            _smashHeight = 0;
             _smashVel = Vector3.zero;
             _smashing = Vector3.zero;
             _rb.useGravity = true;
-            _frozen = false;
             animator.SetBool("Falling", false);
             animator.SetBool("Flying", false);
         }
 
         if (_canJump && _t >= _lastJumpTick + 10)
         {
+            _smashHeight = 0;
             _smashVel = Vector3.zero;
             _smashing = Vector3.zero;
             _rb.useGravity = true;
@@ -211,8 +230,9 @@ public class PlayerMovement : MonoBehaviour
         // Transition to smashing state.
         if (Input.GetMouseButtonUp(0) && (_didSuperJump || !_canJump) && _smashing == Vector3.zero)
         {
-            _camTween.SetRigs(-1, 3, 2.5f, 3, 0.4f);
+            _camTween.SetRigs(4, 3, 2.5f, 3, 0.4f, 3);
             _camTween.targetFov = 70;
+            _smashHeight = gameObject.transform.position.y;
             smashMarker.SetActive(false);
             animator.SetBool("Flying", true);
             _smashing = smashMarker.transform.position;
@@ -229,5 +249,23 @@ public class PlayerMovement : MonoBehaviour
                      Vector3.up, Mathf.Infinity, pushableMask))
             if (hit.rigidbody != null)
                 hit.rigidbody.AddExplosionForce(500f, _rb.position, 10f, 5f);
+        _frozen = false;
+    }
+
+    private void DoBigExplosion()
+    {
+        Instantiate(smashBigExplosion, _rb.position, Quaternion.identity);
+        _camTween.SetRigs(35, 25, 35, 25, 35, 25);
+        _camTween.targetShake = 60;
+        Invoke("ResetRigs", 2f);
+        foreach (var hit in Physics.SphereCastAll(_rb.position, 20f,
+                     Vector3.up, Mathf.Infinity, pushableMask))
+            if (hit.rigidbody != null)
+                hit.rigidbody.AddExplosionForce(800f, _rb.position, 20f, 5f);
+    }
+
+    private void ResetRigs()
+    {
+        _camTween.SetRigs(4, 3, 2.5f, 3, 0.4f, 3);
     }
 }
