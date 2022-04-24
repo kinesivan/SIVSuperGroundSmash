@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 4802759713a95a74fb564c934be2567e
+guid: ca008767b9fdde24d8ccc946d166f84a
 ModelImporter:
   serializedVersion: 19301
   internalIDToNameTable: []
@@ -7,13 +7,8 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
-      name: Material.001
-    second: {fileID: 2100000, guid: d719d1b369b15434a9ade3a20aec8d42, type: 2}
-  - first:
-      type: UnityEngine:Material
-      assembly: UnityEngine.CoreModule
-      name: Material.002
-    second: {fileID: 2100000, guid: 50ea8b03541940141a0dc0e6cd86556f, type: 2}
+      name: Road
+    second: {fileID: 2100000, guid: 92aa2530d5d1ee3408ef33d2a6aa74f5, type: 2}
   materials:
     materialImportMode: 1
     materialName: 0
@@ -46,7 +41,7 @@ ModelImporter:
     lODScreenPercentages: []
     globalScale: 1
     meshCompression: 0
-    addColliders: 1
+    addColliders: 0
     useSRGBMaterialColor: 1
     sortHierarchyByName: 1
     importVisibility: 1
