@@ -17,8 +17,25 @@ public class CameraTween : MonoBehaviour
     public float targetBottomRadius = 3;
 
     public float targetFov = 40;
+    public float targetShake;
 
     public float speed = 4f;
+
+    private const float shakeDamp = 2.5f;
+
+    private CinemachineBasicMultiChannelPerlin _topRigNoise;
+    private CinemachineBasicMultiChannelPerlin _middleRigNoise;
+    private CinemachineBasicMultiChannelPerlin _bottomRigNoise;
+
+    private void Awake()
+    {
+        _topRigNoise = camera.GetRig(0)
+            .GetCinemachineComponent<CinemachineBasicMultiChannelPerlin>();
+        _middleRigNoise = camera.GetRig(1)
+            .GetCinemachineComponent<CinemachineBasicMultiChannelPerlin>();
+        _bottomRigNoise = camera.GetRig(2)
+            .GetCinemachineComponent<CinemachineBasicMultiChannelPerlin>();
+    }
 
     private void Update()
     {
@@ -43,6 +60,15 @@ public class CameraTween : MonoBehaviour
         // Update FOV.
         camera.m_Lens.FieldOfView =
             Mathf.Lerp(camera.m_Lens.FieldOfView, targetFov, speed * Time.deltaTime);
+
+        // Update camera shake.
+        _topRigNoise.m_FrequencyGain = Mathf.Lerp(_topRigNoise.m_FrequencyGain, targetShake,
+            speed * Time.deltaTime);
+        _middleRigNoise.m_FrequencyGain = Mathf.Lerp(_middleRigNoise.m_FrequencyGain, targetShake,
+            speed * Time.deltaTime);
+        _bottomRigNoise.m_FrequencyGain = Mathf.Lerp(_bottomRigNoise.m_FrequencyGain, targetShake,
+            speed * Time.deltaTime);
+        if (targetShake > 0) targetShake = Mathf.Lerp(targetShake, 0, shakeDamp * Time.deltaTime);
     }
 
     public void SetRigs(float topHeight = -1, float topRadius = -1, float middleHeight = -1,

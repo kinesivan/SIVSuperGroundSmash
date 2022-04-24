@@ -9,6 +9,7 @@ public class PlayerMovement : MonoBehaviour
     public Animator animator;
     public Camera camera;
     public CinemachineFreeLook cameraFreeLook;
+    public GameObject smashSmallExplosion;
 
     public float speed;
     public float dashSpeed;
@@ -21,6 +22,7 @@ public class PlayerMovement : MonoBehaviour
     public float groundCheckDist;
     public Transform groundCheck;
     public LayerMask groundCheckMask;
+    public LayerMask pushableMask;
 
     public GameObject smashMarker;
     public Transform playerMesh;
@@ -28,10 +30,12 @@ public class PlayerMovement : MonoBehaviour
 
     private const float DashChargeSpeed = 3;
     private const float MovementDrag = 0.96f;
+    private const float DashPushMaxRadius = 2f;
 
     private Rigidbody _rb;
     private CameraTween _camTween;
 
+    private Vector3 _smashVel;
     private bool _canJump;
     private bool _frozen;
     private bool _didSuperJump;
@@ -56,9 +60,18 @@ public class PlayerMovement : MonoBehaviour
 
         // Update dashing state when active.
         if (Input.GetKey(KeyCode.LeftShift) && _canJump)
+        {
+            foreach (var hit in Physics.SphereCastAll(_rb.position, DashPushMaxRadius * _dashCharge,
+                         Vector3.up, Mathf.Infinity, pushableMask))
+                if (hit.rigidbody != null)
+                    hit.rigidbody.AddForce(_rb.velocity * 2);
+
             _dashCharge = Mathf.Lerp(_dashCharge, 1f, DashChargeSpeed * Time.deltaTime);
+        }
         else
+        {
             _dashCharge = Mathf.Lerp(_dashCharge, 0f, DashChargeSpeed * Time.deltaTime);
+        }
 
         // Update jump charging state when active.
         if (Input.GetButton("Jump") && _canJump)
@@ -90,7 +103,7 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
-        if (!_didSuperJump)
+        if (!_didSuperJump && _smashing == Vector3.zero)
             cameraFreeLook.m_Lens.FieldOfView = Mathf.Lerp(40, 60, _dashCharge);
         var currentSpeed = Mathf.Lerp(speed, dashSpeed, _dashCharge);
 
@@ -125,7 +138,9 @@ public class PlayerMovement : MonoBehaviour
         if (_smashing != Vector3.zero)
         {
             var newVel3 = (_smashing - _rb.position).normalized * smashingSpeed;
-            _rb.velocity = Vector3.Lerp(_rb.velocity, newVel3, smashingAccel * Time.deltaTime);
+            // _rb.velocity = Vector3.Lerp(_rb.velocity, newVel3, smashingAccel * Time.deltaTime);
+            _smashVel = Vector3.Lerp(_smashVel, newVel3, smashingAccel * Time.deltaTime);
+            gameObject.transform.position += _smashVel;
         }
 
         // Apply animation.
@@ -161,8 +176,21 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        if (_canJump && _t >= _lastJumpTick + 10)
+        if (_canJump && _didSuperJump && _t >= _lastSuperJumpTick + 2)
         {
+            if (_smashing != Vector3.zero) DoSmallExplosion();
+
+            _smashVel = Vector3.zero;
+            smashMarker.SetActive(false);
+            _superJumpCharge = 0;
+            _didSuperJump = false;
+        }
+
+        if (_smashing != Vector3.zero && (_smashing - _rb.position).magnitude <= 0.3f)
+        {
+            if (_smashing != Vector3.zero) DoSmallExplosion();
+
+            _smashVel = Vector3.zero;
             _smashing = Vector3.zero;
             _rb.useGravity = true;
             _frozen = false;
@@ -170,23 +198,36 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool("Flying", false);
         }
 
-        if (_canJump && _didSuperJump && _t >= _lastSuperJumpTick + 2)
+        if (_canJump && _t >= _lastJumpTick + 10)
         {
-            smashMarker.SetActive(false);
-            _superJumpCharge = 0;
-            _didSuperJump = false;
+            _smashVel = Vector3.zero;
+            _smashing = Vector3.zero;
+            _rb.useGravity = true;
+            _frozen = false;
+            animator.SetBool("Falling", false);
+            animator.SetBool("Flying", false);
         }
 
         // Transition to smashing state.
         if (Input.GetMouseButtonUp(0) && (_didSuperJump || !_canJump) && _smashing == Vector3.zero)
         {
             _camTween.SetRigs(-1, 3, 2.5f, 3, 0.4f);
-            _camTween.targetFov = 40;
+            _camTween.targetFov = 70;
             smashMarker.SetActive(false);
             animator.SetBool("Flying", true);
             _smashing = smashMarker.transform.position;
             _frozen = true;
             _rb.useGravity = false;
         }
+    }
+
+    private void DoSmallExplosion()
+    {
+        Instantiate(smashSmallExplosion, _rb.position, Quaternion.identity);
+        _camTween.targetShake = 30;
+        foreach (var hit in Physics.SphereCastAll(_rb.position, 10f,
+                     Vector3.up, Mathf.Infinity, pushableMask))
+            if (hit.rigidbody != null)
+                hit.rigidbody.AddExplosionForce(500f, _rb.position, 10f, 5f);
     }
 }
