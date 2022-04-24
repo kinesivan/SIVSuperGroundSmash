@@ -11,6 +11,9 @@ public class PlayerMovement : MonoBehaviour
     public CinemachineFreeLook cameraFreeLook;
     public GameObject smashSmallExplosion;
     public GameObject smashBigExplosion;
+    public ParticleSystem dashParticles;
+    public ParticleSystem flyParticles;
+    public GameObject flyParticlesObj;
 
     public float speed;
     public float dashSpeed;
@@ -36,6 +39,7 @@ public class PlayerMovement : MonoBehaviour
 
     private Rigidbody _rb;
     private CameraTween _camTween;
+    private EmissionPulse _meshPulse;
 
     private Vector3 _smashVel;
     private bool _canJump;
@@ -53,6 +57,7 @@ public class PlayerMovement : MonoBehaviour
     {
         _rb = GetComponent<Rigidbody>();
         _camTween = GetComponent<CameraTween>();
+        _meshPulse = GetComponent<EmissionPulse>();
 
         Cursor.lockState = CursorLockMode.Locked;
     }
@@ -64,6 +69,7 @@ public class PlayerMovement : MonoBehaviour
         // Update dashing state when active.
         if (Input.GetKey(KeyCode.LeftShift) && _canJump)
         {
+            if (!dashParticles.isPlaying) dashParticles.Play();
             foreach (var hit in Physics.SphereCastAll(_rb.position, DashPushMaxRadius * _dashCharge,
                          Vector3.up, Mathf.Infinity, pushableMask))
                 if (hit.rigidbody != null)
@@ -73,6 +79,7 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
+            if (dashParticles.isPlaying) dashParticles.Stop();
             _dashCharge = Mathf.Lerp(_dashCharge, 0f, DashChargeSpeed * Time.deltaTime);
         }
 
@@ -82,6 +89,9 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool("JumpCharging", true);
             _superJumpCharge =
                 Mathf.Lerp(_superJumpCharge, 1f, superJumpChargeSpeed * Time.deltaTime);
+
+            if (!_meshPulse.Playing())
+                _meshPulse.StartPulse();
         }
         else
         {
@@ -173,6 +183,7 @@ public class PlayerMovement : MonoBehaviour
             }
             else
             {
+                _meshPulse.StopPulse();
                 _rb.AddForce(Vector3.up * jumpForce);
             }
 
@@ -190,6 +201,9 @@ public class PlayerMovement : MonoBehaviour
                     DoBigExplosion();
             }
 
+            if (_superJumpCharge <= 0)
+                _meshPulse.StopPulse();
+            if (flyParticles.isPlaying) flyParticles.Stop();
             _smashHeight = 0;
             _smashVel = Vector3.zero;
             smashMarker.SetActive(false);
@@ -208,6 +222,9 @@ public class PlayerMovement : MonoBehaviour
                     DoBigExplosion();
             }
 
+            if (_superJumpCharge <= 0)
+                _meshPulse.StopPulse();
+            if (flyParticles.isPlaying) flyParticles.Stop();
             _smashHeight = 0;
             _smashVel = Vector3.zero;
             _smashing = Vector3.zero;
@@ -218,6 +235,8 @@ public class PlayerMovement : MonoBehaviour
 
         if (_canJump && _t >= _lastJumpTick + 10)
         {
+            if (_superJumpCharge <= 0)
+                _meshPulse.StopPulse();
             _smashHeight = 0;
             _smashVel = Vector3.zero;
             _smashing = Vector3.zero;
@@ -231,6 +250,7 @@ public class PlayerMovement : MonoBehaviour
         if (Input.GetMouseButtonUp(0) && (_didSuperJump || !_canJump) && _smashing == Vector3.zero)
         {
             _camTween.SetRigs(4, 3, 2.5f, 3, 0.4f, 3);
+
             _camTween.targetFov = 70;
             _smashHeight = gameObject.transform.position.y;
             smashMarker.SetActive(false);
@@ -238,6 +258,12 @@ public class PlayerMovement : MonoBehaviour
             _smashing = smashMarker.transform.position;
             _frozen = true;
             _rb.useGravity = false;
+
+            if (!flyParticles.isPlaying)
+            {
+                flyParticles.Play();
+                flyParticlesObj.transform.LookAt(_smashing);
+            }
         }
     }
 
