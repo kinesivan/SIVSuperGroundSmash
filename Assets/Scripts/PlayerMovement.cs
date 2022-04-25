@@ -14,6 +14,10 @@ public class PlayerMovement : MonoBehaviour
     public ParticleSystem dashParticles;
     public ParticleSystem flyParticles;
     public GameObject flyParticlesObj;
+    public AudioClip jumpSound;
+    public AudioClip smallExplosionSound;
+    public AudioClip bigExplosionSound;
+    public AudioSource flySoundSource;
 
     public float speed;
     public float dashSpeed;
@@ -175,6 +179,8 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool("Falling", true);
             _lastJumpTick = _t;
 
+            AudioSource.PlayClipAtPoint(jumpSound, _rb.position);
+
             if (_superJumpCharge > 0.25f)
             {
                 _rb.AddForce(Vector3.up * (superJumpForce * _superJumpCharge));
@@ -201,6 +207,8 @@ public class PlayerMovement : MonoBehaviour
                     DoBigExplosion();
             }
 
+            if (flySoundSource.isPlaying) flySoundSource.Stop();
+
             if (_superJumpCharge <= 0)
                 _meshPulse.StopPulse();
             if (flyParticles.isPlaying) flyParticles.Stop();
@@ -222,6 +230,8 @@ public class PlayerMovement : MonoBehaviour
                     DoBigExplosion();
             }
 
+            if (flySoundSource.isPlaying) flySoundSource.Stop();
+
             if (_superJumpCharge <= 0)
                 _meshPulse.StopPulse();
             if (flyParticles.isPlaying) flyParticles.Stop();
@@ -237,6 +247,7 @@ public class PlayerMovement : MonoBehaviour
         {
             if (_superJumpCharge <= 0)
                 _meshPulse.StopPulse();
+            if (flySoundSource.isPlaying) flySoundSource.Stop();
             _smashHeight = 0;
             _smashVel = Vector3.zero;
             _smashing = Vector3.zero;
@@ -259,6 +270,7 @@ public class PlayerMovement : MonoBehaviour
             _frozen = true;
             _rb.useGravity = false;
 
+            if (!flySoundSource.isPlaying) flySoundSource.Play();
             if (!flyParticles.isPlaying)
             {
                 flyParticles.Play();
@@ -270,6 +282,7 @@ public class PlayerMovement : MonoBehaviour
     private void DoSmallExplosion()
     {
         Instantiate(smashSmallExplosion, _rb.position, Quaternion.identity);
+        AudioSource.PlayClipAtPoint(smallExplosionSound, _rb.position);
         _camTween.targetShake = 30;
         foreach (var hit in Physics.SphereCastAll(_rb.position, 10f,
                      Vector3.up, Mathf.Infinity, pushableMask))
@@ -281,6 +294,7 @@ public class PlayerMovement : MonoBehaviour
     private void DoBigExplosion()
     {
         Instantiate(smashBigExplosion, _rb.position, Quaternion.identity);
+        AudioSource.PlayClipAtPoint(bigExplosionSound, _rb.position);
         _camTween.SetRigs(35, 25, 35, 25, 35, 25);
         _camTween.targetShake = 60;
         Invoke("ResetRigs", 2f);
